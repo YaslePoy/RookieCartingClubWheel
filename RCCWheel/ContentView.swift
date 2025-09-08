@@ -12,23 +12,24 @@ import Network
 
 struct ContentView: View {
     let motion = CMMotionManager()
+    @State var udp: NWConnection
+    @State private var ip : String = "192.168.1.101"
+    @State private var angle: Float = 15.0;
 
 
-    mutating func startAccelerometers() {
+    func startAccelerometers() {
        // Make sure the accelerometer hardware is available.
+        udp.start(queue: DispatchQueue(label: "udp_input"))
        if self.motion.isAccelerometerAvailable {
-           let udpEP = NWEndpoint.hostPort(host: NWEndpoint.Host("192.168.1.101"), port: 5678)
-           
-           let udp = NWConnection(to: udpEP, using: NWParameters.udp)
-           udp.start(queue: DispatchQueue(label: "udp_angle"))
-          self.motion.accelerometerUpdateInterval = 1.0 / 50.0  // 50 Hz
-           self.motion.startAccelerometerUpdates(to: .main){
+           let conn = udp
+           self.motion.accelerometerUpdateInterval = 1.0 / 50.0  // 50 Hz
+           self.motion.startAccelerometerUpdates(to: .main) {
                (d, e) in
                let vec = Vector2D(x: (d?.acceleration.y)!, y: (d?.acceleration.x)!).normalized
                let angle = round(atan2(vec.x, vec.y) * 1800 / Double.pi) / 10
                let data = "angle: \(String(angle))"
                
-               udp.send(content: data.data(using: .utf8), completion: .contentProcessed({e in
+               conn.send(content: data.data(using: .utf8), completion: .contentProcessed({e in
                    if let error = e{
                        print("Some error")
                    }
@@ -38,7 +39,7 @@ struct ContentView: View {
     }
     
     init(){
-        startAccelerometers()
+        udp = NWConnection(host: .ipv4(.loopback), port: .any, using: .udp)
     }
 
     
@@ -46,10 +47,9 @@ struct ContentView: View {
         
     }
     
-    @State private var angle: Float = 15.0;
     var body: some View {
         ZStack{
-            TouchableSwiftUIView().frame(width: .infinity, height: .infinity)
+            TouchableSwiftUIView(udp: $udp).frame(width: .infinity, height: .infinity)
             HStack {
                 Button{
                 } label: {
@@ -57,7 +57,21 @@ struct ContentView: View {
                 }
                 
                 Spacer()
-                Text(String(angle)).fontWeight(Font.Weight.bold).font(Font.title)
+                VStack{
+                    TextField("IP-адрес",text: $ip).multilineTextAlignment(.center).padding().background()
+                    
+                    Button(action: {
+                        motion.stopAccelerometerUpdates()
+                
+                        let ep = NWEndpoint.hostPort(host: NWEndpoint.Host(ip), port: 5678)
+                        udp = NWConnection(to: ep, using: .udp)
+                        startAccelerometers()
+                        
+                    }){
+                        Label("Подключение", systemImage: "network")
+                    }
+                }
+                
                 Spacer()
                 Button{
                 } label: {

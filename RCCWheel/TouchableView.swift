@@ -11,20 +11,27 @@ import Network
 
 class TouchableView: UIView {
     
-    private var udp : NWConnection
+    public var udp : NWConnection
+    
     override init(frame: CGRect) {
-        let udpEP = NWEndpoint.hostPort(host: NWEndpoint.Host("192.168.1.101"), port: 5678)
-        
-        udp = NWConnection(to: udpEP, using: NWParameters.udp)
-        udp.start(queue: DispatchQueue(label: "udp_angle"))
+        udp = NWConnection.init(to: .hostPort(host: .ipv4(.any), port: 0), using: .udp)
+
         super.init(frame: frame)
         setupView()
- 
-
     }
     
+    init(connection: NWConnection){
+        self.udp = connection;
+
+        super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 0))
+
+
+        setupView()
+    }
+    
+    
     required init?(coder: NSCoder) {
-        let udpEP = NWEndpoint.hostPort(host: NWEndpoint.Host("192.168.1.101"), port: 5678)
+        let udpEP = NWEndpoint.hostPort(host: NWEndpoint.Host("172.20.10.6"), port: 5678)
         
         udp = NWConnection(to: udpEP, using: NWParameters.udp)
         udp.start(queue: DispatchQueue(label: "udp_angle"))
@@ -35,9 +42,7 @@ class TouchableView: UIView {
     
     private func setupView() {
         isMultipleTouchEnabled = true  // Важно для двух пальцев!
-        backgroundColor = .systemBackground
-        
-      
+         backgroundColor = .systemBackground
     }
     
     // MARK: - Обработка касаний
@@ -106,12 +111,21 @@ class TouchableView: UIView {
 import SwiftUI
 
 struct TouchableSwiftUIView: UIViewRepresentable {
+    private let connection: NWConnection;
+    
+    init(udp: Binding<NWConnection>){
+        connection = udp.wrappedValue
+    }
     
     func makeUIView(context: Context) -> TouchableView {
-        return TouchableView()
+        var view = TouchableView()
+        view.udp = self.connection
+        return view
     }
     
     func updateUIView(_ uiView: TouchableView, context: Context) {
         // Обновляем при необходимости
+        print("updating")
+        uiView.udp = connection
     }
 }
